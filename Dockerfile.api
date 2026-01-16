@@ -1,0 +1,32 @@
+# Dockerfile.api
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["EnterpriseAPI/EnterpriseAPI.csproj", "EnterpriseAPI/"]
+COPY ["EnterpriseAPI.Application/EnterpriseAPI.Application.csproj", "EnterpriseAPI.Application/"]
+COPY ["EnterpriseAPI.Domain/EnterpriseAPI.Domain.csproj", "EnterpriseAPI.Domain/"]
+COPY ["EnterpriseAPI.Infrastructure/EnterpriseAPI.Infrastructure.csproj", "EnterpriseAPI.Infrastructure/"]
+RUN dotnet restore "EnterpriseAPI/EnterpriseAPI.csproj"
+
+COPY . .
+WORKDIR "/src/EnterpriseAPI"
+RUN dotnet build "EnterpriseAPI.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "EnterpriseAPI.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl --fail http://localhost:80/health || exit 1
+
+ENTRYPOINT ["dotnet", "EnterpriseAPI.dll"]
+# Dockerfile Multi-Stage
+# Docker e Deployment
